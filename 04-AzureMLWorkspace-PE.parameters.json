@@ -1,0 +1,70 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspaceName": {
+            "value": "<AMLWORKSPACE-xxxxxx>"
+        },
+        "tagValues": {
+            "value": {"Purpose": "<Enter project's purpose>"}
+        },
+        "storageAccountOption": {
+            "value": "new"
+        },
+        "storageAccountBehindVNet": {
+            "value": "true"
+        },
+        "storageAccountType": {
+            "value": "Standard_LRS"
+        },
+        "keyVaultOption": {
+            "value": "new"
+        },
+        "keyVaultBehindVNet": {
+            "value": "true"
+        },
+        "applicationInsightsOption": {
+            "value": "new"
+        },
+        "containerRegistryOption": {
+            "value": "new"
+        },
+        "containerRegistrySku": {
+            "value": "Premium"
+        },
+        "containerRegistryBehindVNet": {
+            "value": "true"
+        },
+        "vnetOption": {
+            "value": "existing"
+        },
+        "vnetName": {
+            "value": "<VNET-xxxxxxxxx>"
+        },
+        "subnetOption": {
+            "value": "existing"
+        },
+        "subnetName": {
+            "value": "AzureMLSubnet"
+        },
+        "confidential_data": {
+            "value": "true"
+        },
+        "privateEndpointType": {
+            "value": "AutoApproval"
+        },
+
+        "storageAccountName": {
+            "value": "<EnterKeyVaultNameToBeCreated>" 
+        },
+        "keyVaultName": {
+            "value": "<EnterKeyVaultNameToBeCreated>"
+        },
+        "containerRegistryName": {
+            "value": "<EnterContainerRegistryNameToBeCreated>"
+        },
+        "applicationInsightsName": {
+            "value": "<EnterAppInsightsNameToBeCreated>"
+        }
+    }
+}

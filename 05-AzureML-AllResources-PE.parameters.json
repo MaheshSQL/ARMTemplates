@@ -1,0 +1,21 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualNetworkName": {
+            "value": "<VNET-xxxxxxxxx>"
+        },
+        "subnetName": {
+            "value": "AzureMLSubnet"
+        },
+        "blobStorageAccountName": {
+            "value": "<EnterStorageAcountName>"      //Update the name after the AML Workspace is deployed or same as specified in 04-... parameters file, then run this template.
+        },
+        "keyVaultName": {
+            "value": "<EnterKeyVaultName>"           //Update the name after the AML Workspace is deployed or same as specified in 04-... parameters file, then run this template.
+        },
+        "containerRegistryName": {
+            "value": "<EnterContainerRegistryName>"  //Update the name after the AML Workspace is deployed or same as specified in 04-... parameters file, then run this template.
+        }
+    }
+}

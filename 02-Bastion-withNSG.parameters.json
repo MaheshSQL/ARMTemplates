@@ -1,0 +1,21 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vnet-name": {
+            "value": "<VNET-xxxxxxxxx>"
+        },
+        "BastionSubnetName": {
+            "value": "AzureBastionSubnet"
+        },
+        "bastion-host-name": {
+            "value": "<BASTION-xxxxxxxx>"
+        },
+        "BastionSubnetAddressPrefixes": {
+            "value": "10.0.1.0/24"
+        },
+        "tagPurpose": {
+            "value":  "<Enter project's purpose>"
+        }
+    }
+}

@@ -1,0 +1,30 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workspace_name": {
+            "value": "<AMLWORKSPACE-xxxxxx>"
+        },
+        "cluster_name": {
+            "value": "GPUCLUSTER-NOPIP" //Length cannot exceed 2-16 characters.
+        },
+        "vnet_name": {
+            "value": "<VNET-xxxxxxxxx>"
+        },
+        "subnet_name": {
+            "value": "AzureMLSubnet"
+        },
+        "admin_username": {
+            "value": "<EnterClusterAdminUserName>"
+        },
+        "vm_size_sku": {
+            "value": "Standard_NV6"
+        },
+        "min_node_count": {
+            "value": 0
+        },
+        "max_node_count": {
+            "value": 2          //To start with then to be increased from portal or through incremental deployment of this template.
+        }
+    }
+}

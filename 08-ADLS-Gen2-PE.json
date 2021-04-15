@@ -1,0 +1,287 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+       
+      "virtualNetworkName": {
+        
+        "type": "string",
+        "metadata": {
+          "description": "Specifies the name of the virtual network."
+        }
+      },
+      
+      "subnetName": {
+        "defaultValue": "AzureMLSubnet",
+        "type": "string",
+        "metadata": {
+          "description": "Specifies the name of the subnet."
+        }
+      },
+      
+      "blobStorageAccountName": {
+        "type": "string",
+        "defaultValue": "[parameters('ADLSGen2StorageAccountNameDFS')]", //Same as ADLS Gen2 account since both BLOB and DFS target sub-resources should be enabled for private endpoint.
+        
+        "metadata": {
+          "description": "Specifies the name for the storage account."
+        }
+      },
+      
+      "blobStorageAccountPrivateEndpointNameBLOB": {
+        "type": "string",
+        "defaultValue": "[concat(parameters('blobStorageAccountName'),'-PrivateEndpoint-BLOB')]",
+        "metadata": {
+          "description": "Specifies the name of the private link to the storage account (blob)."
+        }
+      },
+
+       "ADLSGen2StorageAccountNameDFS": {
+        "type": "string",
+        
+        "metadata": {
+          "description": "Specifies the name for the ADLSGen2 storage account."
+        }
+      },
+      
+      "ADLSGen2StorageAccountPrivateEndpointNameDFS": {
+        "type": "string",
+        "defaultValue": "[concat(parameters('ADLSGen2StorageAccountNameDFS'),'-PrivateEndpoint-DFS')]",
+        "metadata": {
+          "description": "Specifies the name of the private link to the storage account (ADLSGen2)."
+        }
+      }
+
+      
+
+    },
+
+    "variables": {
+      "virtualNetworkId": "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+      "subnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), parameters('subnetName'))]",
+      
+      "blobStorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('blobStorageAccountName'))]",
+      
+      "blobPublicDNSZoneForwarderBLOB": "[concat('.blob.', environment().suffixes.storage)]",
+      "blobPrivateDnsZoneNameBLOB": "[concat('privatelink', variables('blobPublicDNSZoneForwarderBLOB'))]",
+      "blobPrivateDnsZoneIdBLOB": "[resourceId('Microsoft.Network/privateDnsZones', variables('blobPrivateDnsZoneNameBLOB'))]",
+      "blobStorageAccountPrivateEndpointIdBLOB": "[resourceId('Microsoft.Network/privateEndpoints', parameters('blobStorageAccountPrivateEndpointNameBLOB'))]",
+      "blobStorageAccountPrivateEndpointGroupNameBLOB": "blob",
+      "blobPrivateDnsZoneGroupBLOB": "[concat(parameters('blobStorageAccountPrivateEndpointNameBLOB'),'/', variables('blobStorageAccountPrivateEndpointGroupNameBLOB'), 'PrivateDnsZoneGroup')]",
+
+      "ADLSGen2StorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('ADLSGen2StorageAccountNameDFS'))]",
+      
+      "ADLSGen2PublicDNSZoneForwarderDFS": "[concat('.dfs.', environment().suffixes.storage)]",
+      "ADLSGen2PrivateDnsZoneNameDFS": "[concat('privatelink', variables('ADLSGen2PublicDNSZoneForwarderDFS'))]",
+      "ADLSGen2PrivateDnsZoneIdDFS": "[resourceId('Microsoft.Network/privateDnsZones', variables('ADLSGen2PrivateDnsZoneNameDFS'))]",
+      "ADLSGen2StorageAccountPrivateEndpointIdDFS": "[resourceId('Microsoft.Network/privateEndpoints', parameters('ADLSGen2StorageAccountPrivateEndpointNameDFS'))]",
+      "ADLSGen2StorageAccountPrivateEndpointGroupNameDFS": "dfs",
+      "ADLSGen2PrivateDnsZoneGroupDFS": "[concat(parameters('ADLSGen2StorageAccountPrivateEndpointNameDFS'),'/', variables('ADLSGen2StorageAccountPrivateEndpointGroupNameDFS'), 'PrivateDnsZoneGroup')]"     
+
+      
+    },
+
+    "resources": [
+
+    /*Target sub-resource : blob */
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2018-09-01",
+      "name": "[variables('blobPrivateDnsZoneNameBLOB')]",
+      "location": "global",
+      "properties": {
+        "maxNumberOfRecordSets": 25000,
+        "maxNumberOfVirtualNetworkLinks": 1000,
+        "maxNumberOfVirtualNetworkLinksWithRegistration": 100
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2018-09-01",
+      "name": "[concat(variables('blobPrivateDnsZoneNameBLOB'), '/link_to_', toLower(parameters('virtualNetworkName')))]",
+      "location": "global",
+      "dependsOn": [
+        "[variables('blobPrivateDnsZoneIdBLOB')]"
+      ],
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[variables('virtualNetworkId')]"
+        }
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2020-04-01",
+      "name": "[parameters('blobStorageAccountPrivateEndpointNameBLOB')]",
+      "location": "[resourceGroup().location]",
+      
+      "properties": {
+        "privateLinkServiceConnections": [
+          {
+            "name": "[parameters('blobStorageAccountPrivateEndpointNameBLOB')]",
+            "properties": {
+              "privateLinkServiceId": "[variables('blobStorageAccountId')]",
+              "groupIds": [
+                "[variables('blobStorageAccountPrivateEndpointGroupNameBLOB')]"
+              ]
+            }
+          }
+        ],
+        "subnet": {
+          "id": "[variables('subnetId')]"
+        },
+        "customDnsConfigs": [
+          {
+            "fqdn": "[concat(parameters('blobStorageAccountName'), variables('blobPublicDNSZoneForwarderBLOB'))]"
+          }
+        ]
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2020-03-01",
+      "name": "[variables('blobPrivateDnsZoneGroupBLOB')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[variables('blobPrivateDnsZoneIdBLOB')]",
+        "[variables('blobStorageAccountPrivateEndpointIdBLOB')]"
+      ],
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "dnsConfig",
+            "properties": {
+              "privateDnsZoneId": "[variables('blobPrivateDnsZoneIdBLOB')]"
+            }
+          }
+        ]
+      }
+    },
+
+    /*Target sub-resource : dfs (ADLS Gen2)*/
+
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2018-09-01",
+      "name": "[variables('ADLSGen2PrivateDnsZoneNameDFS')]",
+      "location": "global",
+      "properties": {
+        "maxNumberOfRecordSets": 25000,
+        "maxNumberOfVirtualNetworkLinks": 1000,
+        "maxNumberOfVirtualNetworkLinksWithRegistration": 100
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2018-09-01",
+      "name": "[concat(variables('ADLSGen2PrivateDnsZoneNameDFS'), '/link_to_', toLower(parameters('virtualNetworkName')))]",
+      "location": "global",
+      "dependsOn": [
+        "[variables('ADLSGen2PrivateDnsZoneIdDFS')]"
+      ],
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[variables('virtualNetworkId')]"
+        }
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2020-04-01",
+      "name": "[parameters('ADLSGen2StorageAccountPrivateEndpointNameDFS')]",
+      "location": "[resourceGroup().location]",
+      
+      "properties": {
+        "privateLinkServiceConnections": [
+          {
+            "name": "[parameters('ADLSGen2StorageAccountPrivateEndpointNameDFS')]",
+            "properties": {
+              "privateLinkServiceId": "[variables('ADLSGen2StorageAccountId')]",
+              "groupIds": [
+                "[variables('ADLSGen2StorageAccountPrivateEndpointGroupNameDFS')]"
+              ]
+            }
+          }
+        ],
+        "subnet": {
+          "id": "[variables('subnetId')]"
+        },
+        "customDnsConfigs": [
+          {
+            "fqdn": "[concat(parameters('ADLSGen2StorageAccountNameDFS'), variables('ADLSGen2PublicDNSZoneForwarderDFS'))]"
+          }
+        ]
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2020-03-01",
+      "name": "[variables('ADLSGen2PrivateDnsZoneGroupDFS')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[variables('ADLSGen2PrivateDnsZoneIdDFS')]",
+        "[variables('ADLSGen2StorageAccountPrivateEndpointIdDFS')]"
+      ],
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "dnsConfig",
+            "properties": {
+              "privateDnsZoneId": "[variables('ADLSGen2PrivateDnsZoneIdDFS')]"
+            }
+          }
+        ]
+      }
+    }
+    
+
+    ],
+
+    "outputs": {
+
+        "blobPrivateDnsZoneNameBLOB": {
+            "type": "string",
+            "value": "[variables('blobPrivateDnsZoneNameBLOB')]"
+        },
+        "virtualNetworkLinksBLOB": {
+            "type": "string",
+            "value": "[concat(variables('blobPrivateDnsZoneNameBLOB'), '/link_to_', toLower(parameters('virtualNetworkName')))]"
+        },
+        "privateEndpointBLOB": {
+            "type": "string",
+            "value": "[parameters('blobStorageAccountPrivateEndpointNameBLOB')]"
+        },
+        "blobPrivateDnsZoneGroupBLOB": {
+            "type": "string",
+            "value": "[variables('blobPrivateDnsZoneGroupBLOB')]"
+        },
+
+
+         "ADLSGen2PrivateDnsZoneNameDFS": {
+            "type": "string",
+            "value": "[variables('ADLSGen2PrivateDnsZoneNameDFS')]"
+        },
+        "virtualNetworkLinksDFS": {
+            "type": "string",
+            "value": "[concat(variables('ADLSGen2PrivateDnsZoneNameDFS'), '/link_to_', toLower(parameters('virtualNetworkName')))]"
+        },
+        "ADLSGen2StorageAccountPrivateEndpointNameDFS": {
+            "type": "string",
+            "value": "[parameters('ADLSGen2StorageAccountPrivateEndpointNameDFS')]"
+        },
+        "ADLSGen2PrivateDnsZoneGroupDFS": {
+            "type": "string",
+            "value": "[variables('ADLSGen2PrivateDnsZoneGroupDFS')]"
+        }
+
+
+    }
+}

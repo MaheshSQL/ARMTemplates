@@ -1,0 +1,32 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualNetworkName":{
+            "value": "<VNET-xxxxxxxxx>"
+        },
+        "subnetName": {
+            "value": "AzureMLSubnet"
+        },
+        "virtualMachineName": {
+            "value": "<VM-xxxxxxxxx>"  //Name cannot exceed 15 characters in length
+        },
+        "virtualMachineSize": {
+            "value": "Standard_NC6"
+        },
+        "adminUsername": {
+            "value": "<AdminUserName>"
+        },
+        "autoShutdownTime": {
+            "value": "2300"             //24Hr format
+        },
+        "autoShutdownNotificationEmail": {
+            "value": "<EnterEmailAddress>"
+        },
+        "tagPurpose": {
+            "value":  "<Enter project's purpose>"
+        }
+        
+
+    }
+}

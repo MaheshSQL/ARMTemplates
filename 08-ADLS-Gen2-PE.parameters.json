@@ -1,0 +1,21 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+
+        "virtualNetworkName": {
+            "value": "<VNET-xxxxxxxxx>"
+        },
+
+        "subnetName": {
+            "value": "AzureMLSubnet"
+        },
+
+
+        "ADLSGen2StorageAccountNameDFS": {      //Both BLOB and DFS target sub-resources should be enabled for ADLS Gen2.
+            "value": "<EnterADLSGen2AccountName>"      //Same as in 07-...json parameters file
+        }
+
+    }
+
+}

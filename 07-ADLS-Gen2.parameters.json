@@ -1,0 +1,56 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        
+        "storageAccountName": {
+            "value": "<EnterADLSGen2AccountName>" 
+        },
+
+        "tagValues": {
+            "value":  "<Enter project's purpose>"
+        },
+       
+        "storageAccountBehindVNet": {
+            "value": "true"
+        },
+
+        "accountType": {
+            "value": "Standard_LRS"
+        },
+
+        "accessTier": {
+            "value": "hot"
+        },
+        "minimumTlsVersion": {
+            "value": "TLS1_2"
+        },
+
+        "isHnsEnabled": {
+            "value": true
+        },
+
+        "supportsHttpsTrafficOnly": {
+            "value": true
+        },
+
+        "allowBlobPublicAccess": {
+            "value": true
+        },
+
+        "allowSharedKeyAccess": {
+            "value": true
+        },
+
+        "vnetName": {
+            "value": "<VNET-xxxxxxxxx>"
+        },
+
+        "subnetName": {
+            "value": "AzureMLSubnet" 
+        }
+
+        
+      
+    }
+}

@@ -1,0 +1,300 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualNetworkName": {
+            "type": "string",
+            "metadata": {
+            "description": "Name of the VNET"
+            }
+        },
+
+        "subnetName": {
+            "type": "string",
+            "defaultValue": "AzureMLSubnet"
+        },
+       
+        "virtualMachineName": {
+            "type": "string"
+            
+        }, 
+     
+        "osDiskType": {
+            "type": "string",
+            "defaultValue": "StandardSSD_LRS"
+        },
+        "virtualMachineSize": {
+            "type": "string",
+            "defaultValue": "Standard_DS4_v2"
+        },
+        "adminUsername": {
+            "type": "string"
+        },
+        "vmAdminPassword": {
+            "type": "secureString"
+        },
+       
+        "autoShutdownStatus": {
+            "type": "string",
+            "defaultValue": "Enabled"
+        },
+        "autoShutdownTime": {
+            "type": "string",
+            "defaultValue": "2300"
+        },
+        "autoShutdownTimeZone": {
+            "type": "string",
+            "defaultValue": "W. Australia Standard Time"
+        },
+        "autoShutdownNotificationStatus": {
+            "type": "string",
+            "defaultValue": "Enabled"
+        },
+        "autoShutdownNotificationLocale": {
+            "type": "string",
+            "defaultValue": "en"
+        },
+        "autoShutdownNotificationEmail": {
+            "type": "string"
+            
+        },
+        "tagPurpose": {
+            "type": "string"            
+        }
+        
+    },
+    "variables": {
+        "networkSecurityGroupName":"[concat(parameters('virtualMachineName'),'-nsg-', substring(uniqueString(resourceGroup().id),0,4))]",
+        "nsgId": "[resourceId(resourceGroup().name, 'Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]",
+        "subnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), parameters('subnetName'))]",
+        "networkInterfaceName": "[concat(parameters('virtualMachineName'),'-nic-', substring(uniqueString(resourceGroup().id),0,4))]"
+    },
+    "resources": [
+        {
+            "name": "[variables('networkInterfaceName')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2018-10-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]"
+                
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            },
+                            "privateIPAllocationMethod": "Dynamic"
+                        }
+                    }
+                ],
+                "networkSecurityGroup": {
+                    "id": "[variables('nsgId')]"
+                }
+            },
+            "tags": {
+                "Purpose": "[parameters('tagPurpose')]"
+            }
+        },
+        {
+            "name": "[variables('networkSecurityGroupName')]",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2019-02-01",
+            "location": "[resourceGroup().location]",
+            
+            /*Commenting below as these are by defaukt added when creating NSG and causes duplication. Kept for future use.*/
+            /*
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "AllowVnetInBound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "sourceAddressPrefix": "VirtualNetwork",
+                            "destinationPortRange": "*",
+                            "destinationAddressPrefix": "VirtualNetwork",
+                            "access": "Allow",
+                            "priority": 3997,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "AllowAzureLoadBalancerInBound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "sourceAddressPrefix": "VirtualNetwork",
+                            "destinationPortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 3998,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "DenyAllInBound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationPortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Deny",
+                            "priority": 3999,
+                            "direction": "Inbound"
+                        }
+                    },
+
+                    
+                    {
+                        "name": "AllowVnetOutBound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "sourceAddressPrefix": "VirtualNetwork",
+                            "destinationPortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 3997,
+                            "direction": "Outbound"
+                        }
+                    },
+
+                    {
+                        "name": "AllowInternetOutBound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "sourceAddressPrefix": "VirtualNetwork",
+                            "destinationPortRange": "*",
+                            "destinationAddressPrefix": "Internet",
+                            "access": "Allow",
+                            "priority": 3998,
+                            "direction": "Outbound"
+                        }
+                    },
+
+                    {
+                        "name": "DenyAllOutBound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Deny",
+                            "priority": 3999,
+                            "direction": "Outbound"
+                        }
+                    }
+
+
+                ]
+
+            },
+            */
+
+            "tags": {
+                "Purpose": "[parameters('tagPurpose')]"
+            }
+        },
+        
+        {
+            "name": "[parameters('virtualMachineName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2020-12-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize":  "[parameters('virtualMachineSize')]"
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "createOption": "fromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[parameters('osDiskType')]"
+                        }
+                    },
+                    "imageReference": {
+                        "publisher": "microsoft-dsvm",
+                        "offer": "dsvm-win-2019",
+                        "sku": "server-2019",
+                        "version": "latest"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachineName')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('vmAdminPassword')]"
+
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                }
+            },
+            "identity": {
+                "type": "systemAssigned"
+            },
+            "tags": {
+                "Purpose": "[parameters('tagPurpose')]"
+            }
+        },
+        {
+            "name": "[concat('shutdown-computevm-', parameters('virtualMachineName'))]",
+            "type": "Microsoft.DevTestLab/schedules",
+            "apiVersion": "2017-04-26-preview",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', parameters('virtualMachineName'))]"
+            ],
+            "properties": {
+                "status": "[parameters('autoShutdownStatus')]",
+                "taskType": "ComputeVmShutdownTask",
+                "dailyRecurrence": {
+                    "time": "[parameters('autoShutdownTime')]"
+                },
+                "timeZoneId": "[parameters('autoShutdownTimeZone')]",
+                "targetResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachineName'))]",
+                "notificationSettings": {
+                    "status": "[parameters('autoShutdownNotificationStatus')]",
+                    "notificationLocale": "[parameters('autoShutdownNotificationLocale')]",
+                    "timeInMinutes": "30",
+                    "emailRecipient": "[parameters('autoShutdownNotificationEmail')]"
+                }
+            },
+            "tags": {
+                "Purpose": "[parameters('tagPurpose')]"
+            }
+        }
+    ],
+    "outputs": {
+        "adminUsername": {
+            "type": "string",
+            "value": "[parameters('adminUsername')]"
+        },
+        "virtualMachineName": {
+            "type": "string",
+            "value": "[parameters('virtualMachineName')]"
+        },
+        "virtualMachineSize": {
+            "type": "string",
+            "value": "[parameters('virtualMachineSize')]"
+        }
+    }
+}

@@ -1,0 +1,511 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+       
+      "virtualNetworkName": {
+        
+        "type": "string",
+        "metadata": {
+          "description": "Specifies the name of the virtual network."
+        }
+      },
+      
+      "subnetName": {
+        "defaultValue": "AzureMLSubnet",
+        "type": "string",
+        "metadata": {
+          "description": "Specifies the name of the subnet."
+        }
+      },
+      
+      "blobStorageAccountName": {
+        "type": "string",
+        
+        "metadata": {
+          "description": "Specifies the name for the storage account."
+        }
+      },
+      
+      "blobStorageAccountPrivateEndpointNameBLOB": {
+        "type": "string",
+        "defaultValue": "[concat(parameters('blobStorageAccountName'),'-PrivateEndpoint-BLOB')]",
+        "metadata": {
+          "description": "Specifies the name of the private link to the storage account (blob)."
+        }
+      },
+
+       "blobStorageAccountPrivateEndpointNameFILE": {
+        "type": "string",
+        "defaultValue": "[concat(parameters('blobStorageAccountName'),'-PrivateEndpoint-FILE')]",
+        "metadata": {
+          "description": "Specifies the name of the private link to the storage account (file)."
+        }
+      },
+
+      "keyVaultName": {
+        "type": "string",
+        
+        "metadata": {
+          "description": "Specifies the name for the key vault."
+        }
+      },
+
+      "keyVaultPrivateEndpointName": {
+        "type": "string",
+        "defaultValue": "[concat(parameters('keyVaultName'),'-PrivateEndpoint')]",
+        "metadata": {
+          "description": "Specifies the name of the private link to the key vault."
+        }
+      },
+
+       "containerRegistryName": {
+        "type": "string",
+        
+        "metadata": {
+          "description": "Specifies the name for the container registry."
+        }
+      },
+
+      "containerRegistryPrivateEndpointName": {
+        "type": "string",
+        "defaultValue": "[concat(parameters('containerRegistryName'),'-PrivateEndpoint')]",
+        "metadata": {
+          "description": "Specifies the name of the private link to the container registry."
+        }
+      }
+
+    },
+
+    "variables": {
+      "virtualNetworkId": "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+      "subnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), parameters('subnetName'))]",
+      
+      "blobStorageAccountId": "[resourceId('Microsoft.Storage/storageAccounts', parameters('blobStorageAccountName'))]",
+      
+      "blobPublicDNSZoneForwarderBLOB": "[concat('.blob.', environment().suffixes.storage)]",
+      "blobPrivateDnsZoneNameBLOB": "[concat('privatelink', variables('blobPublicDNSZoneForwarderBLOB'))]",
+      "blobPrivateDnsZoneIdBLOB": "[resourceId('Microsoft.Network/privateDnsZones', variables('blobPrivateDnsZoneNameBLOB'))]",
+      "blobStorageAccountPrivateEndpointIdBLOB": "[resourceId('Microsoft.Network/privateEndpoints', parameters('blobStorageAccountPrivateEndpointNameBLOB'))]",
+      "blobStorageAccountPrivateEndpointGroupNameBLOB": "blob",
+      "blobPrivateDnsZoneGroupBLOB": "[concat(parameters('blobStorageAccountPrivateEndpointNameBLOB'),'/', variables('blobStorageAccountPrivateEndpointGroupNameBLOB'), 'PrivateDnsZoneGroup')]",
+
+      "blobPublicDNSZoneForwarderFILE": "[concat('.file.', environment().suffixes.storage)]",
+      "blobPrivateDnsZoneNameFILE": "[concat('privatelink', variables('blobPublicDNSZoneForwarderFILE'))]",
+      "blobPrivateDnsZoneIdFILE": "[resourceId('Microsoft.Network/privateDnsZones', variables('blobPrivateDnsZoneNameFILE'))]",
+      "blobStorageAccountPrivateEndpointIdFILE": "[resourceId('Microsoft.Network/privateEndpoints', parameters('blobStorageAccountPrivateEndpointNameFILE'))]",
+      "blobStorageAccountPrivateEndpointGroupNameFILE": "file",
+      "blobPrivateDnsZoneGroupFILE": "[concat(parameters('blobStorageAccountPrivateEndpointNameFILE'),'/', variables('blobStorageAccountPrivateEndpointGroupNameFILE'), 'PrivateDnsZoneGroup')]",
+
+      "keyVaultId": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+      "keyVaultPublicDNSZoneForwarder": "[if(equals(toLower(environment().name), 'azureusgovernment'), '.vaultcore.usgovcloudapi.net', '.vaultcore.azure.net')]",
+      "keyVaultPrivateDnsZoneName": "[concat('privatelink', variables('keyVaultPublicDNSZoneForwarder'))]",
+      "keyVaultPrivateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', variables('keyVaultPrivateDnsZoneName'))]",
+      "keyVaultPrivateEndpointId": "[resourceId('Microsoft.Network/privateEndpoints', parameters('keyVaultPrivateEndpointName'))]",
+      "keyVaultPrivateEndpointGroupName": "vault",
+      "keyVaultPrivateDnsZoneGroup": "[concat(parameters('keyVaultPrivateEndpointName'),'/', variables('keyVaultPrivateEndpointGroupName'), 'PrivateDnsZoneGroup')]",
+
+      "containerRegistryId": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName'))]",
+      "containerRegistryPublicDNSZoneForwarder": ".azurecr.io",
+      "containerRegistryPrivateDnsZoneName": "[concat('privatelink', variables('containerRegistryPublicDNSZoneForwarder'))]",
+      "containerRegistryPrivateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', variables('containerRegistryPrivateDnsZoneName'))]",
+      "containerRegistryPrivateEndpointId": "[resourceId('Microsoft.Network/privateEndpoints', parameters('containerRegistryPrivateEndpointName'))]",
+      "containerRegistryPrivateEndpointGroupName": "registry",
+      "containerRegistryPrivateDnsZoneGroup": "[concat(parameters('containerRegistryPrivateEndpointName'),'/', variables('containerRegistryPrivateEndpointGroupName'), 'PrivateDnsZoneGroup')]"
+    },
+
+    "resources": [
+
+    /*Target sub-resource : blob */
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2018-09-01",
+      "name": "[variables('blobPrivateDnsZoneNameBLOB')]",
+      "location": "global",
+      "properties": {
+        "maxNumberOfRecordSets": 25000,
+        "maxNumberOfVirtualNetworkLinks": 1000,
+        "maxNumberOfVirtualNetworkLinksWithRegistration": 100
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2018-09-01",
+      "name": "[concat(variables('blobPrivateDnsZoneNameBLOB'), '/link_to_', toLower(parameters('virtualNetworkName')))]",
+      "location": "global",
+      "dependsOn": [
+        "[variables('blobPrivateDnsZoneIdBLOB')]"
+      ],
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[variables('virtualNetworkId')]"
+        }
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2020-04-01",
+      "name": "[parameters('blobStorageAccountPrivateEndpointNameBLOB')]",
+      "location": "[resourceGroup().location]",
+      
+      "properties": {
+        "privateLinkServiceConnections": [
+          {
+            "name": "[parameters('blobStorageAccountPrivateEndpointNameBLOB')]",
+            "properties": {
+              "privateLinkServiceId": "[variables('blobStorageAccountId')]",
+              "groupIds": [
+                "[variables('blobStorageAccountPrivateEndpointGroupNameBLOB')]"
+              ]
+            }
+          }
+        ],
+        "subnet": {
+          "id": "[variables('subnetId')]"
+        },
+        "customDnsConfigs": [
+          {
+            "fqdn": "[concat(parameters('blobStorageAccountName'), variables('blobPublicDNSZoneForwarderBLOB'))]"
+          }
+        ]
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2020-03-01",
+      "name": "[variables('blobPrivateDnsZoneGroupBLOB')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[variables('blobPrivateDnsZoneIdBLOB')]",
+        "[variables('blobStorageAccountPrivateEndpointIdBLOB')]"
+      ],
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "dnsConfig",
+            "properties": {
+              "privateDnsZoneId": "[variables('blobPrivateDnsZoneIdBLOB')]"
+            }
+          }
+        ]
+      }
+    },
+
+    /*Target sub-resource : file (fileshare)*/
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2018-09-01",
+      "name": "[variables('blobPrivateDnsZoneNameFILE')]",
+      "location": "global",
+      "properties": {
+        "maxNumberOfRecordSets": 25000,
+        "maxNumberOfVirtualNetworkLinks": 1000,
+        "maxNumberOfVirtualNetworkLinksWithRegistration": 100
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2018-09-01",
+      "name": "[concat(variables('blobPrivateDnsZoneNameFILE'), '/link_to_', toLower(parameters('virtualNetworkName')))]",
+      "location": "global",
+      "dependsOn": [
+        "[variables('blobPrivateDnsZoneIdFILE')]"
+      ],
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[variables('virtualNetworkId')]"
+        }
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2020-04-01",
+      "name": "[parameters('blobStorageAccountPrivateEndpointNameFILE')]",
+      "location": "[resourceGroup().location]",
+      
+      "properties": {
+        "privateLinkServiceConnections": [
+          {
+            "name": "[parameters('blobStorageAccountPrivateEndpointNameFILE')]",
+            "properties": {
+              "privateLinkServiceId": "[variables('blobStorageAccountId')]",
+              "groupIds": [
+                "[variables('blobStorageAccountPrivateEndpointGroupNameFILE')]"
+              ]
+            }
+          }
+        ],
+        "subnet": {
+          "id": "[variables('subnetId')]"
+        },
+        "customDnsConfigs": [
+          {
+            "fqdn": "[concat(parameters('blobStorageAccountName'), variables('blobPublicDNSZoneForwarderFILE'))]"
+          }
+        ]
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2020-03-01",
+      "name": "[variables('blobPrivateDnsZoneGroupFILE')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[variables('blobPrivateDnsZoneIdFILE')]",
+        "[variables('blobStorageAccountPrivateEndpointIdFILE')]"
+      ],
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "dnsConfig",
+            "properties": {
+              "privateDnsZoneId": "[variables('blobPrivateDnsZoneIdFILE')]"
+            }
+          }
+        ]
+      }
+    },
+
+    /*Target resource : Key Vault */
+
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2018-09-01",
+      "name": "[variables('keyVaultPrivateDnsZoneName')]",
+      "location": "global",
+      "properties": {
+        "maxNumberOfRecordSets": 25000,
+        "maxNumberOfVirtualNetworkLinks": 1000,
+        "maxNumberOfVirtualNetworkLinksWithRegistration": 100
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2018-09-01",
+      "name": "[concat(variables('keyVaultPrivateDnsZoneName'), '/link_to_', toLower(parameters('virtualNetworkName')))]",
+      "location": "global",
+      "dependsOn": [
+        "[variables('keyVaultPrivateDnsZoneId')]"
+      ],
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[variables('virtualNetworkId')]"
+        }
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2020-04-01",
+      "name": "[parameters('keyVaultPrivateEndpointName')]",
+      "location": "[resourceGroup().location]",
+      
+      "properties": {
+        "privateLinkServiceConnections": [
+          {
+            "name": "[parameters('keyVaultPrivateEndpointName')]",
+            "properties": {
+              "privateLinkServiceId": "[variables('keyVaultId')]",
+              "groupIds": [
+                "[variables('keyVaultPrivateEndpointGroupName')]"
+              ]
+            }
+          }
+        ],
+        "subnet": {
+          "id": "[variables('subnetId')]"
+        },
+        "customDnsConfigs": [
+          {
+            "fqdn": "[concat(parameters('keyVaultName'), variables('keyVaultPublicDNSZoneForwarder'))]"
+          }
+        ]
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2020-03-01",
+      "name": "[variables('keyVaultPrivateDnsZoneGroup')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[variables('keyVaultPrivateDnsZoneId')]",
+        "[variables('keyVaultPrivateEndpointId')]"
+      ],
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "dnsConfig",
+            "properties": {
+              "privateDnsZoneId": "[variables('keyVaultPrivateDnsZoneId')]"
+            }
+          }
+        ]
+      }
+    },
+
+    /*Target resource : Container Registry */
+
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2018-09-01",
+      "name": "[variables('containerRegistryPrivateDnsZoneName')]",
+      "location": "global",
+      "properties": {
+        "maxNumberOfRecordSets": 25000,
+        "maxNumberOfVirtualNetworkLinks": 1000,
+        "maxNumberOfVirtualNetworkLinksWithRegistration": 100
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2018-09-01",
+      "name": "[concat(variables('containerRegistryPrivateDnsZoneName'), '/link_to_', toLower(parameters('virtualNetworkName')))]",
+      "location": "global",
+      "dependsOn": [
+        "[variables('containerRegistryPrivateDnsZoneId')]"
+      ],
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[variables('virtualNetworkId')]"
+        }
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2020-04-01",
+      "name": "[parameters('containerRegistryPrivateEndpointName')]",
+      "location": "[resourceGroup().location]",
+      
+      "properties": {
+        "privateLinkServiceConnections": [
+          {
+            "name": "[parameters('containerRegistryPrivateEndpointName')]",
+            "properties": {
+              "privateLinkServiceId": "[variables('containerRegistryId')]",
+              "groupIds": [
+                "[variables('containerRegistryPrivateEndpointGroupName')]"
+              ]
+            }
+          }
+        ],
+        "subnet": {
+          "id": "[variables('subnetId')]"
+        },
+        "customDnsConfigs": [
+          {
+            "fqdn": "[concat(parameters('containerRegistryName'), variables('containerRegistryPublicDNSZoneForwarder'))]"
+          }
+        ]
+      }
+    },
+
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2020-03-01",
+      "name": "[variables('containerRegistryPrivateDnsZoneGroup')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[variables('containerRegistryPrivateDnsZoneId')]",
+        "[variables('containerRegistryPrivateEndpointId')]"
+      ],
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "dnsConfig",
+            "properties": {
+              "privateDnsZoneId": "[variables('containerRegistryPrivateDnsZoneId')]"
+            }
+          }
+        ]
+      }
+    }
+
+    ],
+
+    "outputs": {
+        "blobPrivateDnsZoneNameBLOB": {
+            "type": "string",
+            "value": "[variables('blobPrivateDnsZoneNameBLOB')]"
+        },
+        "virtualNetworkLinksBLOB": {
+            "type": "string",
+            "value": "[concat(variables('blobPrivateDnsZoneNameBLOB'), '/link_to_', toLower(parameters('virtualNetworkName')))]"
+        },
+        "privateEndpointBLOB": {
+            "type": "string",
+            "value": "[parameters('blobStorageAccountPrivateEndpointNameBLOB')]"
+        },
+        "blobPrivateDnsZoneGroupBLOB": {
+            "type": "string",
+            "value": "[variables('blobPrivateDnsZoneGroupBLOB')]"
+        },
+
+         "blobPrivateDnsZoneNameFILE": {
+            "type": "string",
+            "value": "[variables('blobPrivateDnsZoneNameFILE')]"
+        },
+        "virtualNetworkLinksFILE": {
+            "type": "string",
+            "value": "[concat(variables('blobPrivateDnsZoneNameFILE'), '/link_to_', toLower(parameters('virtualNetworkName')))]"
+        },
+        "privateEndpointFILE": {
+            "type": "string",
+            "value": "[parameters('blobStorageAccountPrivateEndpointNameFILE')]"
+        },
+        "blobPrivateDnsZoneGroupFILE": {
+            "type": "string",
+            "value": "[variables('blobPrivateDnsZoneGroupFILE')]"
+        },
+
+
+        "keyVaultPrivateDnsZoneName": {
+            "type": "string",
+            "value": "[variables('keyVaultPrivateDnsZoneName')]"
+        },
+        "keyVaultVirtualNetworkLinks": {
+            "type": "string",
+            "value": "[concat(variables('keyVaultPrivateDnsZoneName'), '/link_to_', toLower(parameters('virtualNetworkName')))]"
+        },
+        "keyVaultPrivateEndpoint": {
+            "type": "string",
+            "value": "[parameters('keyVaultPrivateEndpointName')]"
+        },
+        "keyVaultPrivateDnsZoneGroup": {
+            "type": "string",
+            "value": "[variables('keyVaultPrivateDnsZoneGroup')]"
+        },
+
+        "containerRegistryPrivateDnsZoneName": {
+            "type": "string",
+            "value": "[variables('containerRegistryPrivateDnsZoneName')]"
+        },
+        "containerRegistryVirtualNetworkLinks": {
+            "type": "string",
+            "value": "[concat(variables('containerRegistryPrivateDnsZoneName'), '/link_to_', toLower(parameters('virtualNetworkName')))]"
+        },
+        "containerRegistryPrivateEndpoint": {
+            "type": "string",
+            "value": "[parameters('containerRegistryPrivateEndpointName')]"
+        },
+        "containerRegistryPrivateDnsZoneGroup": {
+            "type": "string",
+            "value": "[variables('containerRegistryPrivateDnsZoneGroup')]"
+        }
+
+
+    }
+}

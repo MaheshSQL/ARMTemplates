@@ -1,0 +1,158 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storageAccountName": {
+            "type": "string"
+        },
+        "accountType": {
+        "type": "string",
+        "defaultValue": "Standard_LRS",
+        "allowedValues": [
+          "Standard_LRS",
+          "Standard_GRS",
+          "Standard_RAGRS",
+          "Standard_ZRS",
+          "Standard_GZRS",
+          "Standard_RAGZRS"
+        ]
+      },
+        "accessTier": {
+            "type": "string",
+            "defaultValue":"hot"
+        },
+        "minimumTlsVersion": {
+            "type": "string",
+            "defaultValue": "TLS1_2"
+        },
+        "supportsHttpsTrafficOnly": {
+            "type": "bool",
+            "defaultValue": true
+        },
+        "allowBlobPublicAccess": {
+            "type": "bool",
+            "defaultValue": true
+        },
+        "allowSharedKeyAccess": {
+            "type": "bool",
+            "defaultValue": true
+        },
+        "isHnsEnabled": {
+            "type": "bool",
+            "defaultValue": true
+        },
+
+        "storageAccountBehindVNet": {
+        "type": "string",
+        "defaultValue": "false",
+        "allowedValues": [
+          "true",
+          "false"
+        ],
+        "metadata": {
+          "description": "Determines whether or not to put the storage account behind VNet"
+        }
+      },
+      "vnetName": {
+        "type": "string",
+        "metadata": {
+          "description": "Name of the VNet"
+        }
+      },
+      "subnetName": {
+        "type": "string",
+        "metadata": {
+          "description": "Name of the subnet"
+        }
+      },
+
+      "tagValues": {
+        "type": "string",
+        "metadata": {
+          "description": "description"
+        }  
+    },
+
+"networkAclsBypass": {
+"type": "string",
+"defaultValue": "AzureServices"
+  
+},
+
+"networkAclsDefaultAction": {
+  "type": "string",
+  "defaultValue": "Deny"
+}
+
+
+    },
+    "variables": {
+        "storageAccount": "[resourceId(resourceGroup().name, 'Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+        "vnet": "[resourceId(resourceGroup().name, 'Microsoft.Network/virtualNetworks', parameters('vnetName'))]",
+        "subnet": "[resourceId(resourceGroup().name, 'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('subnetName'))]",
+        "networkRuleSetBehindVNet": {
+        "defaultAction": "deny",
+        "virtualNetworkRules": [
+          {
+            "action": "Allow",
+            "id": "[variables('subnet')]"
+          }
+        ]
+      },
+
+      "networkAclsVirtualNetworkRules":
+            [
+                {
+                    "id": "[variables('subnet')]"
+                }
+            ]
+
+      
+    },
+    "resources": [
+        {
+            "name": "[parameters('storageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-06-01",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "accessTier": "[parameters('accessTier')]",
+                "minimumTlsVersion": "[parameters('minimumTlsVersion')]",
+                "supportsHttpsTrafficOnly": "[parameters('supportsHttpsTrafficOnly')]",
+                "allowBlobPublicAccess": "[parameters('allowBlobPublicAccess')]",
+                "allowSharedKeyAccess": "[parameters('allowSharedKeyAccess')]",
+                //"networkAcls": "[if(equals(parameters('storageAccountBehindVNet'), 'true'), variables('networkRuleSetBehindVNet'), json('null'))]",
+                "isHnsEnabled": "[parameters('isHnsEnabled')]"
+
+                
+                ,"networkAcls": {
+                    "bypass": "[parameters('networkAclsBypass')]",
+                    "defaultAction": "[parameters('networkAclsDefaultAction')]",
+                    "ipRules": [],
+                    "virtualNetworkRules": "[variables('networkAclsVirtualNetworkRules')]"
+                }
+                
+
+            },
+            
+            "sku": {
+                "name": "[parameters('accountType')]"
+            },
+            "kind": "StorageV2",
+            "tags": {
+                "Purpose": "[parameters('tagValues')]"
+            }
+        }
+    ],
+    "outputs": {
+        "storageAccountName": {
+            "type": "string",
+            "value": "[parameters('storageAccountName')]"
+        },
+
+        "networkAclsVirtualNetworkRules": {
+          "type": "array",
+          "value": "[variables('networkAclsVirtualNetworkRules')]"
+        }
+    }
+}

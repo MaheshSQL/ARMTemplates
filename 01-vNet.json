@@ -1,0 +1,102 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    
+    
+    "parameters": {
+        "vNetName": {
+            "type": "string",
+            "metadata": {
+                "description": "vNet Name"
+            }
+        },
+        "vNetAddressPrefixes": {
+            "type": "string",
+            "defaultValue":"10.0.0.0/16",
+            "metadata": {
+                "description": "vNet Address Prefixes"
+            }
+        }
+        ,
+        "tagPurpose": {
+            "type": "string",
+            "metadata": {
+                "description": "Purpose tag"
+            }
+        },
+        "BastionSubnetName": {
+            "type": "string",
+            "defaultValue": "AzureBastionSubnet",
+            "metadata": {
+                "description": "Bastion Subnet Name"
+            }
+        },
+        "AzureMLSubnetName": {
+            "type": "string",
+            "defaultValue": "AzureMLSubnet",
+            "metadata": {
+                "description": "Azure ML Subnet Name"
+            }
+        },
+        "BastionSubnetAddressPrefixes": {
+            "type": "string",
+            "defaultValue": "10.0.1.0/24",
+            "metadata": {
+                "description": "description"
+            }
+        },
+        "AzureMLSubnetAddressPrefixes": {
+            "type": "string",
+            "defaultValue": "10.0.2.0/24",
+            "metadata": {
+                "description": "description"
+            }
+        }
+    },
+    
+    "variables": {},
+
+    "resources": [
+        {
+            "name": "[parameters('vNetName')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-08-01", //"2020-05-01"
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "Purpose": "[parameters('tagPurpose')]"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('vNetAddressPrefixes')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[parameters('BastionSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('BastionSubnetAddressPrefixes')]"
+                        }
+                    },
+                    {
+                        "name": "[parameters('AzureMLSubnetName')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('AzureMLSubnetAddressPrefixes')]",
+                        
+                        /*Below Service Endpoint/s is required for Azure ML PE deployment*/
+                        "serviceEndpoints": [
+                            {"service": "Microsoft.ContainerRegistry"},
+                            {"service": "Microsoft.KeyVault"},
+                            {"service": "Microsoft.Storage"}
+                        ],
+
+                        "privateEndpointNetworkPolicies": "Disabled",
+                        "PrivateLinkServiceNetworkPolicies": "Enabled" 
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {}
+}
